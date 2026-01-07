@@ -23,8 +23,14 @@ builder.Services.AddSingleton<ITocExtractor, GenericNavTocExtractor>();
 builder.Services.AddSingleton<PdfMerger>();
 
 var httpClientBuilder = builder.Services.AddHttpClient();
-httpClientBuilder.AddHttpClient<UrlValidator>();
-httpClientBuilder.AddHttpClient<LinkDiscoveryService>();
+httpClientBuilder.AddHttpClient<UrlValidator>(client =>
+{
+    client.Timeout = TimeSpan.FromMinutes(10);
+});
+httpClientBuilder.AddHttpClient<LinkDiscoveryService>(client =>
+{
+    client.Timeout = TimeSpan.FromMinutes(10);
+});
 
 var app = builder.Build();
 
@@ -57,9 +63,13 @@ app.MapPost("/api/books", async (BookRequest request, JobStateService jobState, 
     });
 
     var serviceProvider = app.Services;
+    
     _ = Task.Run(async () =>
     {
         PlaywrightPdfRenderer? pdfRenderer = null;
+        using var jobCts = new CancellationTokenSource();
+        var jobToken = jobCts.Token;
+        
         try
         {
             jobState.SetStatus(jobId, new BookJobStatus
@@ -72,16 +82,21 @@ app.MapPost("/api/books", async (BookRequest request, JobStateService jobState, 
 
             var dnsResolver = serviceProvider.GetRequiredService<IDnsResolver>();
             var httpClientFactory = serviceProvider.GetRequiredService<IHttpClientFactory>();
+            
             var urlValidatorHttpClient = httpClientFactory.CreateClient();
+            urlValidatorHttpClient.Timeout = TimeSpan.FromMinutes(10);
             var urlValidator = new UrlValidator(dnsResolver, urlValidatorHttpClient);
             
             var linkDiscoveryHttpClient = httpClientFactory.CreateClient();
+            linkDiscoveryHttpClient.Timeout = TimeSpan.FromMinutes(10);
             var linkDiscovery = new LinkDiscoveryService(linkDiscoveryHttpClient);
             
             var tocExtractor = serviceProvider.GetRequiredService<ITocExtractor>();
             pdfRenderer = new PlaywrightPdfRenderer();
             var pdfMerger = serviceProvider.GetRequiredService<PdfMerger>();
+            
             var bookGeneratorHttpClient = httpClientFactory.CreateClient();
+            bookGeneratorHttpClient.Timeout = TimeSpan.FromMinutes(10);
             
             var jobGenerator = new BookGenerator(urlValidator, linkDiscovery, tocExtractor, pdfRenderer, pdfMerger, bookGeneratorHttpClient);
 
@@ -95,13 +110,28 @@ app.MapPost("/api/books", async (BookRequest request, JobStateService jobState, 
                 request.Title,
                 jobId,
                 progress,
-                cancellationToken);
+                jobToken);
 
             var finalStatus = jobState.GetStatus(jobId);
             jobState.SetStatus(jobId, finalStatus! with 
             { 
                 State = JobState.Completed,
                 OutputFilePath = outputPath
+            });
+        }
+        catch (OperationCanceledException)
+        {
+            var currentStatus = jobState.GetStatus(jobId);
+            jobState.SetStatus(jobId, (currentStatus ?? new BookJobStatus
+            {
+                JobId = jobId,
+                State = JobState.Pending,
+                PagesTotal = 0,
+                PagesRendered = 0
+            }) with 
+            { 
+                State = JobState.Failed,
+                ErrorMessage = "Job was canceled or timed out"
             });
         }
         catch (Exception ex)
@@ -126,7 +156,7 @@ app.MapPost("/api/books", async (BookRequest request, JobStateService jobState, 
                 await pdfRenderer.DisposeAsync();
             }
         }
-    }, cancellationToken);
+    });
 
     return Results.Ok(new { jobId });
 })

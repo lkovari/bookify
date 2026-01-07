@@ -59,13 +59,22 @@ public sealed class PlaywrightPdfRenderer : IAsyncDisposable
 
         try
         {
-            await page.GotoAsync(url.ToString(), new PageGotoOptions
+            var urlString = url.ToString();
+            await page.GotoAsync(urlString, new PageGotoOptions
             {
                 WaitUntil = WaitUntilState.NetworkIdle,
                 Timeout = 60000
             });
 
-            await Task.Delay(2000, cancellationToken);
+            if (url.Fragment.StartsWith("#/", StringComparison.Ordinal))
+            {
+                await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+                await Task.Delay(3000, cancellationToken);
+            }
+            else
+            {
+                await Task.Delay(2000, cancellationToken);
+            }
 
             await page.AddStyleTagAsync(new PageAddStyleTagOptions
             {

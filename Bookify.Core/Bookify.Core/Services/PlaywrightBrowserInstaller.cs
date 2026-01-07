@@ -2,7 +2,7 @@ namespace Bookify.Core.Services;
 
 public static class PlaywrightBrowserInstaller
 {
-    public static async Task InstallBrowsersAsync()
+    public static Task InstallBrowsersAsync()
     {
         try
         {
@@ -11,6 +11,7 @@ public static class PlaywrightBrowserInstaller
             {
                 throw new Exception($"Playwright browser installation failed with exit code {exitCode}");
             }
+            return Task.CompletedTask;
         }
         catch (Exception ex)
         {

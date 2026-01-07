@@ -122,10 +122,18 @@ public sealed class LinkDiscoveryService
 
             if (Uri.TryCreate(baseUrl, href, out var absoluteUri))
             {
-                var normalized = new UriBuilder(absoluteUri)
+                var builder = new UriBuilder(absoluteUri);
+                
+                if (href.StartsWith("#", StringComparison.Ordinal) && href.StartsWith("#/", StringComparison.Ordinal))
                 {
-                    Fragment = string.Empty
-                }.Uri;
+                    builder.Fragment = href.Substring(1);
+                }
+                else if (!string.IsNullOrEmpty(builder.Fragment) && !builder.Fragment.StartsWith("#/", StringComparison.Ordinal))
+                {
+                    builder.Fragment = string.Empty;
+                }
+                
+                var normalized = builder.Uri;
 
                 if (normalized.Host == baseHost && normalized.Scheme is "http" or "https")
                 {
@@ -141,10 +149,15 @@ public sealed class LinkDiscoveryService
     {
         var builder = new UriBuilder(uri)
         {
-            Fragment = string.Empty,
             Query = string.Empty,
             Port = uri.IsDefaultPort ? -1 : uri.Port
         };
+        
+        if (string.IsNullOrEmpty(builder.Fragment) || !builder.Fragment.StartsWith("#/", StringComparison.Ordinal))
+        {
+            builder.Fragment = string.Empty;
+        }
+        
         var normalized = builder.Uri.ToString().TrimEnd('/');
         if (normalized.EndsWith("/index", StringComparison.OrdinalIgnoreCase) || 
             normalized.EndsWith("/index.html", StringComparison.OrdinalIgnoreCase))

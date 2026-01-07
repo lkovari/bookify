@@ -55,6 +55,47 @@ public sealed class BookGenerator
             var toc = await _tocExtractor.ExtractAsync(validatedUrl, html, cancellationToken);
 
             var pages = await _linkDiscovery.DiscoverAsync(validatedUrl, cancellationToken);
+            
+            string NormalizePageUrlForMerge(Uri uri)
+            {
+                var builder = new UriBuilder(uri)
+                {
+                    Query = string.Empty
+                };
+                
+                if (string.IsNullOrEmpty(builder.Fragment) || !builder.Fragment.StartsWith("#/", StringComparison.Ordinal))
+                {
+                    builder.Fragment = string.Empty;
+                }
+                
+                return builder.Uri.ToString().TrimEnd('/').ToLowerInvariant();
+            }
+            
+            IEnumerable<Uri> GetAllTocUrls(TocNode node)
+            {
+                yield return node.Url;
+                foreach (var child in node.Children)
+                {
+                    foreach (var url in GetAllTocUrls(child))
+                    {
+                        yield return url;
+                    }
+                }
+            }
+            
+            var tocUrls = GetAllTocUrls(toc).ToList();
+            var discoveredUrlSet = new HashSet<string>(pages.Select(NormalizePageUrlForMerge));
+            
+            foreach (var tocUrl in tocUrls)
+            {
+                var normalized = NormalizePageUrlForMerge(tocUrl);
+                if (!discoveredUrlSet.Contains(normalized) && tocUrl.Host == validatedUrl.Host)
+                {
+                    pages.Add(tocUrl);
+                    discoveredUrlSet.Add(normalized);
+                }
+            }
+            
             if (pages.Count == 0)
             {
                 pages = new List<Uri> { validatedUrl };
@@ -149,24 +190,29 @@ public sealed class BookGenerator
     {
         var ordered = new List<Uri>();
         var seen = new HashSet<string>();
-        var pageSet = new HashSet<string>(pages.Select(p => NormalizePageUrl(p)));
+        var pageSet = new HashSet<string>(pages.Select(p => NormalizePageUrlForOrdering(p)));
 
-        string NormalizePageUrl(Uri uri)
+        string NormalizePageUrlForOrdering(Uri uri)
         {
             var builder = new UriBuilder(uri)
             {
-                Fragment = string.Empty,
                 Query = string.Empty
             };
+            
+            if (string.IsNullOrEmpty(builder.Fragment) || !builder.Fragment.StartsWith("#/", StringComparison.Ordinal))
+            {
+                builder.Fragment = string.Empty;
+            }
+            
             return builder.Uri.ToString().TrimEnd('/').ToLowerInvariant();
         }
 
         void TraverseToc(TocNode node)
         {
-            var normalized = NormalizePageUrl(node.Url);
+            var normalized = NormalizePageUrlForOrdering(node.Url);
             if (pageSet.Contains(normalized) && !seen.Contains(normalized))
             {
-                var matchingPage = pages.FirstOrDefault(p => NormalizePageUrl(p) == normalized);
+                var matchingPage = pages.FirstOrDefault(p => NormalizePageUrlForOrdering(p) == normalized);
                 if (matchingPage != null)
                 {
                     ordered.Add(matchingPage);
@@ -183,7 +229,7 @@ public sealed class BookGenerator
         TraverseToc(toc);
 
         var remaining = pages
-            .Where(p => !seen.Contains(NormalizePageUrl(p)))
+            .Where(p => !seen.Contains(NormalizePageUrlForOrdering(p)))
             .ToList();
         ordered.AddRange(remaining);
 

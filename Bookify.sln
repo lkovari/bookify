@@ -1,0 +1,46 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Bookify.Core", "Bookify.Core\Bookify.Core\Bookify.Core.csproj", "{C1B34E7B-B62E-42A3-9247-B621BEDB4827}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Bookify.WebApi", "Bookify.WebApi\Bookify.WebApi\Bookify.WebApi.csproj", "{9DD2DBC2-7BE7-4705-9B57-D57ACED816C4}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Bookify.Worker", "Bookify.Worker\Bookify.Worker\Bookify.Worker.csproj", "{680FE056-C101-4EAC-A392-DCCAEF92A9CA}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Bookify.Core.Tests", "Bookify.Core.Tests\Bookify.Core.Tests\Bookify.Core.Tests.csproj", "{7F847160-AB28-4CA3-A3BD-965D40C31D2C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Bookify.WebApi.Tests", "Bookify.WebApi.Tests\Bookify.WebApi.Tests\Bookify.WebApi.Tests.csproj", "{4848168C-C282-42E6-937E-7D5964C62E9E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Bookify.Worker.Tests", "Bookify.Worker.Tests\Bookify.Worker.Tests\Bookify.Worker.Tests.csproj", "{AA7685CE-EC53-461A-AA07-AEBD855B364F}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{C1B34E7B-B62E-42A3-9247-B621BEDB4827}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C1B34E7B-B62E-42A3-9247-B621BEDB4827}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C1B34E7B-B62E-42A3-9247-B621BEDB4827}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C1B34E7B-B62E-42A3-9247-B621BEDB4827}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9DD2DBC2-7BE7-4705-9B57-D57ACED816C4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9DD2DBC2-7BE7-4705-9B57-D57ACED816C4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9DD2DBC2-7BE7-4705-9B57-D57ACED816C4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9DD2DBC2-7BE7-4705-9B57-D57ACED816C4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{680FE056-C101-4EAC-A392-DCCAEF92A9CA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{680FE056-C101-4EAC-A392-DCCAEF92A9CA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{680FE056-C101-4EAC-A392-DCCAEF92A9CA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{680FE056-C101-4EAC-A392-DCCAEF92A9CA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7F847160-AB28-4CA3-A3BD-965D40C31D2C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7F847160-AB28-4CA3-A3BD-965D40C31D2C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7F847160-AB28-4CA3-A3BD-965D40C31D2C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7F847160-AB28-4CA3-A3BD-965D40C31D2C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4848168C-C282-42E6-937E-7D5964C62E9E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4848168C-C282-42E6-937E-7D5964C62E9E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4848168C-C282-42E6-937E-7D5964C62E9E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4848168C-C282-42E6-937E-7D5964C62E9E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AA7685CE-EC53-461A-AA07-AEBD855B364F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AA7685CE-EC53-461A-AA07-AEBD855B364F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AA7685CE-EC53-461A-AA07-AEBD855B364F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AA7685CE-EC53-461A-AA07-AEBD855B364F}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

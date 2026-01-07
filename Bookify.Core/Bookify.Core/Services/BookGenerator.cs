@@ -95,7 +95,8 @@ public sealed class BookGenerator
                 });
             });
 
-            var finalPdfPath = Path.Combine(tempDir, $"{title ?? "book"}.pdf");
+            var fileName = GenerateFileName(title, jobId);
+            var finalPdfPath = Path.Combine(tempDir, fileName);
             var orderedPdfFiles = pdfFiles
                 .OrderBy(kvp => kvp.Key)
                 .Select(kvp => kvp.Value)
@@ -187,6 +188,32 @@ public sealed class BookGenerator
         ordered.AddRange(remaining);
 
         return ordered;
+    }
+
+    private static string GenerateFileName(string? title, Guid jobId)
+    {
+        if (string.IsNullOrWhiteSpace(title))
+        {
+            return $"book{jobId}.pdf";
+        }
+
+        var parts = title.Split(new[] { ' ', '\t', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
+        var fileName = string.Join("", parts.Select(part =>
+        {
+            if (string.IsNullOrEmpty(part))
+            {
+                return string.Empty;
+            }
+
+            if (part.Length == 1)
+            {
+                return part.ToUpperInvariant();
+            }
+
+            return char.ToUpperInvariant(part[0]) + part.Substring(1);
+        }));
+
+        return $"{fileName}{jobId}.pdf";
     }
 }
 

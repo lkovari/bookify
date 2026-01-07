@@ -217,7 +217,8 @@ app.MapGet("/api/books/{jobId:guid}/file", (Guid jobId, JobStateService jobState
     }
 
     var fileBytes = File.ReadAllBytes(status.OutputFilePath);
-    return Results.File(fileBytes, "application/pdf", $"{jobId}.pdf");
+    var fileName = Path.GetFileName(status.OutputFilePath);
+    return Results.File(fileBytes, "application/pdf", fileName);
 })
 .WithName("DownloadBook")
 .Produces(StatusCodes.Status200OK)

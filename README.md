@@ -449,6 +449,8 @@ This section outlines potential enhancements and improvements that can be made t
 
 ### Crawling & Discovery
 
+- **Excluded URLs**: Allow users to specify URL patterns or specific URLs to exclude from crawling (e.g., exclude `/api/*`, `/admin/*`, or specific pages)
+- **External URLs Processing**: Allow users to specify external URLs or domains that should be processed even though they're on different hosts (e.g., include related documentation sites or cross-domain content)
 - **Smarter Deduplication**: Content-based deduplication to detect similar pages with different URLs
 - **Content Analysis**: Analyze page content to determine if it's worth including
 - **Pagination Detection**: Automatically detect and follow pagination links

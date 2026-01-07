@@ -45,11 +45,6 @@ app.UseHttpsRedirection();
 
 app.MapGet("/", () => Results.Redirect("/swagger")).ExcludeFromDescription();
 
-var summaries = new[]
-{
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
-
 app.MapPost("/api/books", async (BookRequest request, JobStateService jobState, CancellationToken cancellationToken) =>
 {
     var jobId = Guid.NewGuid();
@@ -63,12 +58,15 @@ app.MapPost("/api/books", async (BookRequest request, JobStateService jobState, 
     });
 
     var serviceProvider = app.Services;
+    var tempDir = Path.Combine(Path.GetTempPath(), "bookify", jobId.ToString());
+    jobState.RegisterTempDirectory(jobId, tempDir);
     
     _ = Task.Run(async () =>
     {
         PlaywrightPdfRenderer? pdfRenderer = null;
         using var jobCts = new CancellationTokenSource();
         var jobToken = jobCts.Token;
+        jobState.RegisterCancellationToken(jobId, jobCts);
         
         try
         {
@@ -255,26 +253,164 @@ app.MapGet("/api/books/{jobId:guid}/file", (Guid jobId, JobStateService jobState
 .Produces(StatusCodes.Status400BadRequest)
 .Produces(StatusCodes.Status404NotFound);
 
-app.MapGet("/weatherforecast", () =>
+app.MapPost("/api/books/{jobId:guid}/cancel", (Guid jobId, JobStateService jobState) =>
 {
-    var forecast =  Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
+    var status = jobState.GetStatus(jobId);
+    if (status == null)
+    {
+        return Results.NotFound(new { error = "Job not found", jobId });
+    }
+
+    if (status.State == JobState.Completed || status.State == JobState.Failed)
+    {
+        return Results.BadRequest(new 
+        { 
+            error = "Job is already finished", 
+            jobId,
+            state = status.State.ToString()
+        });
+    }
+
+    var canceled = jobState.CancelJob(jobId);
+    if (!canceled)
+    {
+        return Results.BadRequest(new 
+        { 
+            error = "Job cannot be canceled", 
+            jobId,
+            message = "Job may have already been canceled or is not running"
+        });
+    }
+
+    jobState.SetStatus(jobId, status with 
+    { 
+        State = JobState.Failed,
+        ErrorMessage = "Job was canceled by user"
+    });
+
+    return Results.Ok(new 
+    { 
+        message = "Job canceled successfully", 
+        jobId 
+    });
 })
-.WithName("GetWeatherForecast");
+.WithName("CancelBook")
+.Produces<object>(StatusCodes.Status200OK)
+.Produces(StatusCodes.Status400BadRequest)
+.Produces(StatusCodes.Status404NotFound);
+
+app.MapPost("/api/books/{jobId:guid}/cancel-and-save", async (Guid jobId, JobStateService jobState, IServiceProvider serviceProvider) =>
+{
+    var status = jobState.GetStatus(jobId);
+    if (status == null)
+    {
+        return Results.NotFound(new { error = "Job not found", jobId });
+    }
+
+    if (status.State == JobState.Completed || status.State == JobState.Failed)
+    {
+        return Results.BadRequest(new 
+        { 
+            error = "Job is already finished", 
+            jobId,
+            state = status.State.ToString()
+        });
+    }
+
+    var canceled = jobState.CancelJob(jobId);
+    if (!canceled)
+    {
+        return Results.BadRequest(new 
+        { 
+            error = "Job cannot be canceled", 
+            jobId,
+            message = "Job may have already been canceled or is not running"
+        });
+    }
+
+    await Task.Delay(2000);
+
+    var tempDir = jobState.GetTempDirectory(jobId);
+    if (string.IsNullOrEmpty(tempDir) || !Directory.Exists(tempDir))
+    {
+        jobState.SetStatus(jobId, status with 
+        { 
+            State = JobState.Failed,
+            ErrorMessage = "Job was canceled but no temporary directory found to save partial PDF"
+        });
+        return Results.BadRequest(new 
+        { 
+            error = "Cannot save partial PDF", 
+            jobId,
+            message = "Temporary directory not found"
+        });
+    }
+
+    try
+    {
+        var pdfFiles = Directory.GetFiles(tempDir, "page_*.pdf")
+            .OrderBy(f => f)
+            .Where(f => File.Exists(f))
+            .ToList();
+
+        if (pdfFiles.Count == 0)
+        {
+            jobState.SetStatus(jobId, status with 
+            { 
+                State = JobState.Failed,
+                ErrorMessage = "Job was canceled but no PDF files were found to merge"
+            });
+            return Results.BadRequest(new 
+            { 
+                error = "No PDF files to merge", 
+                jobId,
+                message = "No pages were rendered before cancellation"
+            });
+        }
+
+        var pdfMerger = serviceProvider.GetRequiredService<PdfMerger>();
+        var fileName = $"partial{jobId}.pdf";
+        var outputPath = Path.Combine(tempDir, fileName);
+        
+        pdfMerger.MergeFiles(pdfFiles, outputPath);
+        
+        jobState.SetStatus(jobId, status with 
+        { 
+            State = JobState.Completed,
+            OutputFilePath = outputPath,
+            PagesRendered = pdfFiles.Count
+        });
+
+        return Results.Ok(new 
+        { 
+            message = "Job canceled and partial PDF saved", 
+            jobId,
+            pagesRendered = pdfFiles.Count,
+            pagesTotal = status.PagesTotal,
+            outputFilePath = outputPath
+        });
+    }
+    catch (Exception ex)
+    {
+        jobState.SetStatus(jobId, status with 
+        { 
+            State = JobState.Failed,
+            ErrorMessage = $"Job was canceled but failed to save partial PDF: {ex.Message}"
+        });
+        return Results.BadRequest(new 
+        { 
+            error = "Failed to save partial PDF", 
+            jobId,
+            message = ex.Message
+        });
+    }
+})
+.WithName("CancelAndSaveBook")
+.Produces<object>(StatusCodes.Status200OK)
+.Produces(StatusCodes.Status400BadRequest)
+.Produces(StatusCodes.Status404NotFound);
 
 app.Run();
-
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}
 
 public partial class Program { }
 

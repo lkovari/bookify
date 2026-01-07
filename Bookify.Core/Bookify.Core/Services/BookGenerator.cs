@@ -157,6 +157,10 @@ public sealed class BookGenerator
 
             return finalPdfPath;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             progress?.Report(new BookJobStatus
@@ -171,8 +175,29 @@ public sealed class BookGenerator
         }
         finally
         {
-            await Task.Delay(1000, cancellationToken);
+            if (!cancellationToken.IsCancellationRequested)
+            {
+                await Task.Delay(1000, cancellationToken);
+            }
         }
+    }
+
+    public string MergePartialPdfs(string tempDir, string? title, Guid jobId)
+    {
+        var pdfFiles = Directory.GetFiles(tempDir, "page_*.pdf")
+            .OrderBy(f => f)
+            .Where(f => File.Exists(f))
+            .ToList();
+
+        if (pdfFiles.Count == 0)
+        {
+            throw new InvalidOperationException("No PDF files found to merge");
+        }
+
+        var fileName = GenerateFileName(title, jobId);
+        var finalPdfPath = Path.Combine(tempDir, fileName);
+        _pdfMerger.MergeFiles(pdfFiles, finalPdfPath);
+        return finalPdfPath;
     }
 
     private async Task<string> FetchHtmlAsync(Uri url, CancellationToken cancellationToken)

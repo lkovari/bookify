@@ -299,11 +299,48 @@ The WebApi project provides RESTful HTTP endpoints for book conversion:
   - Returns error message if job failed
   - 404 if job not found
 
+**POST `/api/books/{jobId}/cancel`** - Cancel a running job
+- **Response**: 
+  ```json
+  {
+    "message": "Job canceled successfully",
+    "jobId": "guid"
+  }
+  ```
+- **Behavior**: 
+  - Cancels the job immediately
+  - Sets job state to Failed with "Job was canceled by user" message
+  - Returns error if job not found, already completed, or cannot be canceled
+  - Does not save any partial PDFs
+
+**POST `/api/books/{jobId}/cancel-and-save`** - Cancel job and save partial PDF
+- **Response**: 
+  ```json
+  {
+    "message": "Job canceled and partial PDF saved",
+    "jobId": "guid",
+    "pagesRendered": 5,
+    "pagesTotal": 10,
+    "outputFilePath": "/path/to/partial{jobId}.pdf"
+  }
+  ```
+- **Behavior**: 
+  - Cancels the job
+  - Waits 2 seconds for in-progress operations to complete
+  - Merges all rendered PDF pages into a partial PDF
+  - Sets job state to Completed with the partial PDF path
+  - Returns error if no PDFs were rendered or merge fails
+  - Partial PDF is named `partial{jobId}.pdf`
+
 #### Job State Management
 
 - **Current Implementation**: In-memory `ConcurrentDictionary<Guid, BookJobStatus>`
 - **Service**: `JobStateService` manages job lifecycle
 - **Thread Safety**: Uses concurrent collections for thread-safe access
+- **Cancellation Support**: 
+  - Each job has its own `CancellationTokenSource` for cancellation
+  - Cancellation tokens are registered and can be canceled via API endpoints
+  - Temporary directories are tracked for partial PDF generation
 - **Limitations**: 
   - Jobs lost on application restart
   - Not suitable for multi-instance deployments

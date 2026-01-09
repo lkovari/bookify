@@ -6,11 +6,11 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Bookify.WebApi", "Bookify.W
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Bookify.Worker", "Bookify.Worker\Bookify.Worker\Bookify.Worker.csproj", "{680FE056-C101-4EAC-A392-DCCAEF92A9CA}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Bookify.Core.Tests", "Bookify.Core.Tests\Bookify.Core.Tests\Bookify.Core.Tests.csproj", "{7F847160-AB28-4CA3-A3BD-965D40C31D2C}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Bookify.Core.Tests", "Bookify.Core.Tests\Bookify.Core.Tests.csproj", "{7F847160-AB28-4CA3-A3BD-965D40C31D2C}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Bookify.WebApi.Tests", "Bookify.WebApi.Tests\Bookify.WebApi.Tests\Bookify.WebApi.Tests.csproj", "{4848168C-C282-42E6-937E-7D5964C62E9E}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Bookify.WebApi.Tests", "Bookify.WebApi.Tests\Bookify.WebApi.Tests.csproj", "{4848168C-C282-42E6-937E-7D5964C62E9E}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Bookify.Worker.Tests", "Bookify.Worker.Tests\Bookify.Worker.Tests\Bookify.Worker.Tests.csproj", "{AA7685CE-EC53-461A-AA07-AEBD855B364F}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Bookify.Worker.Tests", "Bookify.Worker.Tests\Bookify.Worker.Tests.csproj", "{AA7685CE-EC53-461A-AA07-AEBD855B364F}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

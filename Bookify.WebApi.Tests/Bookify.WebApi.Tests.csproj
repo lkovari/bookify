@@ -20,7 +20,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Bookify.WebApi\Bookify.WebApi.csproj" />
+    <ProjectReference Include="..\Bookify.WebApi\Bookify.WebApi\Bookify.WebApi.csproj" />
   </ItemGroup>
 
 </Project>

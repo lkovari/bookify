@@ -12,6 +12,8 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.0.1" />
     <PackageReference Include="xunit" Version="2.9.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+    <PackageReference Include="NSubstitute" Version="5.3.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.2" />
   </ItemGroup>
 
   <ItemGroup>
@@ -19,8 +21,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Bookify.Worker\Bookify.Worker.csproj" />
-    <ProjectReference Include="..\Bookify.Core\Bookify.Core.csproj" />
+    <ProjectReference Include="..\Bookify.Worker\Bookify.Worker\Bookify.Worker.csproj" />
+    <ProjectReference Include="..\Bookify.Core\Bookify.Core\Bookify.Core.csproj" />
   </ItemGroup>
 
 </Project>

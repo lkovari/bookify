@@ -201,7 +201,9 @@ Renders web pages to PDF using headless Chromium:
   - Saves to temporary directory with indexed filenames
 - **Error Handling**: 
   - Automatic browser installation if missing
-  - Graceful error handling with informative messages
+  - Enhanced error messages that include the URL being processed
+  - Specific handling for page crashes and timeouts
+  - Error messages provide context about which page failed and why
 
 #### 5. PDF Merging (`PdfMerger`)
 
@@ -224,23 +226,32 @@ Coordinates the entire conversion workflow:
 - **Process Flow**: 
   1. Validates input URL using `UrlValidator`
   2. Fetches initial HTML and extracts TOC using `ITocExtractor`
-  3. Discovers all internal pages using `LinkDiscoveryService`
-  4. Orders pages according to TOC structure
-  5. Renders each page to PDF in parallel (max 2 concurrent)
-  6. Merges all PDFs in correct order
-  7. Returns path to final PDF file
+  3. **Reports initial page count from TOC** (provides early progress visibility)
+  4. Discovers all internal pages using `LinkDiscoveryService`
+  5. Updates page count with final merged total
+  6. Orders pages according to TOC structure
+  7. Renders each page to PDF in parallel (max 2 concurrent)
+  8. Merges all PDFs in correct order
+  9. Returns path to final PDF file
 - **Progress Reporting**: 
   - Uses `IProgress<BookJobStatus>` for real-time updates
-  - Reports pages total, pages rendered, and current state
+  - Reports pages total immediately after TOC extraction (before link discovery completes)
+  - Updates page count when link discovery completes
+  - Reports pages rendered, and current state
   - Updates job status throughout the process
 - **Resource Management**: 
   - Creates temporary directory per job (using jobId)
   - Cleans up temporary files after completion
   - Proper disposal of Playwright resources
 - **Error Handling**: 
+  - **Resilient page rendering**: Individual page failures don't crash the entire job
+  - Failed pages are tracked with their URLs and error messages
+  - Job completes successfully if at least one page renders successfully
+  - Failed pages are logged in the job status error message
+  - Job only fails if all pages fail to render
   - Catches exceptions at each stage
-  - Reports errors with descriptive messages
-  - Updates job status to Failed on errors
+  - Reports errors with descriptive messages including which pages failed
+  - Updates job status to Failed only when all pages fail or critical errors occur
 
 ### WebApi Project (Bookify.WebApi)
 
@@ -292,12 +303,19 @@ The WebApi project provides RESTful HTTP endpoints for book conversion:
 - **Behavior**: Returns detailed status with progress percentage
 
 **GET `/api/books/{jobId}/file`** - Download generated PDF
-- **Response**: PDF file stream (application/pdf)
+- **Response**: PDF file stream (application/pdf) or error response
 - **Behavior**: 
-  - Returns PDF file when job is Completed
-  - Returns error with progress info if not completed
+  - Returns PDF file when job is Completed (even if some pages failed)
+  - Returns detailed progress info if not completed:
+    - Shows page count and progress percentage
+    - Displays remaining pages count
+    - Provides descriptive messages based on job state
   - Returns error message if job failed
   - 404 if job not found
+- **Progress Messages**:
+  - `"Discovering pages and analyzing site structure..."` - When pagesTotal is 0 and job is running
+  - `"Processing: X of Y pages rendered (Z remaining)"` - When pages are being rendered
+  - `"Job is queued and will start shortly..."` - When job is pending
 
 **POST `/api/books/{jobId}/cancel`** - Cancel a running job
 - **Response**: 
@@ -570,6 +588,44 @@ dotnet run
 - **SSRF Protection**: Blocks internal/private network targets
 - **External Links**: Preserved as clickable links in PDF, never crawled
 - **Internal Links Only**: Only pages from the same host are crawled
+
+## Recent Improvements
+
+This section documents recent enhancements and improvements that have been implemented:
+
+### Resilient Page Rendering (2024)
+
+- **Individual Page Failure Handling**: The system now gracefully handles individual page failures without crashing the entire job
+  - If a page crashes or times out during rendering, it's skipped and other pages continue processing
+  - Failed pages are tracked with their URLs and error messages
+  - The job completes successfully as long as at least one page renders successfully
+  - Failed page information is included in the job status error message for debugging
+
+- **Enhanced Error Messages**: Improved error reporting throughout the system
+  - Page rendering errors now include the specific URL that failed
+  - Error messages distinguish between page crashes, timeouts, and other failures
+  - Better context for debugging issues with specific pages
+
+### Early Progress Reporting (2024)
+
+- **TOC-Based Page Count**: The system now reports an initial page count immediately after TOC extraction
+  - Previously, `pagesTotal` remained 0 until link discovery completed (which could take a long time)
+  - Now, as soon as the TOC is extracted from the navigation, an initial page count is reported
+  - This provides much earlier visibility into the job's scope
+  - The count is updated when link discovery completes with the final merged total
+
+- **Improved API Response Messages**: Enhanced progress messages in the `/api/books/{jobId}/file` endpoint
+  - More descriptive messages based on job state
+  - Shows remaining pages count: `"Processing: X of Y pages rendered (Z remaining)"`
+  - Better messages for different states (Pending, Running, etc.)
+
+### Benefits
+
+These improvements provide:
+- **Better User Experience**: Users see progress information much earlier in the process
+- **Higher Success Rate**: Jobs complete successfully even when some pages fail
+- **Better Debugging**: Clear error messages help identify problematic pages
+- **More Reliable**: The system is more resilient to individual page failures
 
 ## Future Improvements
 

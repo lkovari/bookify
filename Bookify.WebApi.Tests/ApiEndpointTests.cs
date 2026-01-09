@@ -130,6 +130,12 @@ public sealed class ApiEndpointTests : IClassFixture<WebApplicationFactory<Progr
         using var response = await client.GetAsync($"/api/books/{jobId}/file");
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var result = await response.Content.ReadFromJsonAsync<Dictionary<string, object>>();
+        Assert.NotNull(result);
+        Assert.True(result.ContainsKey("error"));
+        Assert.True(result.ContainsKey("message"));
+        Assert.True(result.ContainsKey("pagesTotal"));
+        Assert.True(result.ContainsKey("pagesRendered"));
     }
 
     [Fact]

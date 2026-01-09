@@ -81,7 +81,7 @@ public sealed class LinkDiscoveryService
             .Select(g => g.First())
             .OrderBy(u => u.ToString())
             .ToList();
-        
+
         return uniqueUrls;
     }
 
@@ -123,16 +123,18 @@ public sealed class LinkDiscoveryService
             if (Uri.TryCreate(baseUrl, href, out var absoluteUri))
             {
                 var builder = new UriBuilder(absoluteUri);
-                
-                if (href.StartsWith("#", StringComparison.Ordinal) && href.StartsWith("#/", StringComparison.Ordinal))
+
+                // If href is a SPA hash route like "#/remote-a", keep it as fragment "/remote-a".
+                if (href.StartsWith("#/", StringComparison.Ordinal))
                 {
-                    builder.Fragment = href.Substring(1);
+                    builder.Fragment = href.Substring(1); // "/remote-a"
                 }
-                else if (!string.IsNullOrEmpty(builder.Fragment) && !builder.Fragment.StartsWith("#/", StringComparison.Ordinal))
+                else if (!string.IsNullOrEmpty(builder.Fragment) && !builder.Fragment.StartsWith("/", StringComparison.Ordinal))
                 {
+                    // Keep only SPA-style fragments; drop "#section" anchors to reduce duplicates.
                     builder.Fragment = string.Empty;
                 }
-                
+
                 var normalized = builder.Uri;
 
                 if (normalized.Host == baseHost && normalized.Scheme is "http" or "https")
@@ -152,20 +154,21 @@ public sealed class LinkDiscoveryService
             Query = string.Empty,
             Port = uri.IsDefaultPort ? -1 : uri.Port
         };
-        
-        if (string.IsNullOrEmpty(builder.Fragment) || !builder.Fragment.StartsWith("#/", StringComparison.Ordinal))
+
+        // UriBuilder.Fragment does NOT contain '#'. Hash routes "#/x" become "/x" here.
+        if (string.IsNullOrEmpty(builder.Fragment) || !builder.Fragment.StartsWith("/", StringComparison.Ordinal))
         {
             builder.Fragment = string.Empty;
         }
-        
+
         var normalized = builder.Uri.ToString().TrimEnd('/');
-        if (normalized.EndsWith("/index", StringComparison.OrdinalIgnoreCase) || 
+        if (normalized.EndsWith("/index", StringComparison.OrdinalIgnoreCase) ||
             normalized.EndsWith("/index.html", StringComparison.OrdinalIgnoreCase))
         {
             normalized = normalized.Replace("/index", "", StringComparison.OrdinalIgnoreCase)
                                    .Replace("/index.html", "", StringComparison.OrdinalIgnoreCase);
         }
+
         return normalized;
     }
 }
-

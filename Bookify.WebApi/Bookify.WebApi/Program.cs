@@ -45,7 +45,7 @@ app.UseHttpsRedirection();
 
 app.MapGet("/", () => Results.Redirect("/swagger")).ExcludeFromDescription();
 
-app.MapPost("/api/books", async (BookRequest request, JobStateService jobState, CancellationToken cancellationToken) =>
+app.MapPost("/api/books", (BookRequest request, JobStateService jobState, CancellationToken cancellationToken) =>
 {
     var jobId = Guid.NewGuid();
     
@@ -219,9 +219,32 @@ app.MapGet("/api/books/{jobId:guid}/file", (Guid jobId, JobStateService jobState
 
     if (status.State != JobState.Completed)
     {
-        var progress = status.PagesTotal > 0 
-            ? Math.Round((double)status.PagesRendered / status.PagesTotal * 100, 2) 
-            : 0;
+        string message;
+        double progress;
+        
+        if (status.PagesTotal == 0)
+        {
+            if (status.State == JobState.Running)
+            {
+                message = "Discovering pages and analyzing site structure...";
+            }
+            else if (status.State == JobState.Pending)
+            {
+                message = "Job is queued and will start shortly...";
+            }
+            else
+            {
+                message = "Job is starting...";
+            }
+            progress = 0;
+        }
+        else
+        {
+            progress = Math.Round((double)status.PagesRendered / status.PagesTotal * 100, 2);
+            var remaining = status.PagesTotal - status.PagesRendered;
+            message = $"Processing: {status.PagesRendered} of {status.PagesTotal} pages rendered ({remaining} remaining)";
+        }
+        
         return Results.BadRequest(new 
         { 
             error = "Job is not completed yet", 
@@ -230,7 +253,7 @@ app.MapGet("/api/books/{jobId:guid}/file", (Guid jobId, JobStateService jobState
             progress = $"{progress}%",
             pagesRendered = status.PagesRendered,
             pagesTotal = status.PagesTotal,
-            message = $"Processing: {status.PagesRendered} of {status.PagesTotal} pages rendered"
+            message = message
         });
     }
 

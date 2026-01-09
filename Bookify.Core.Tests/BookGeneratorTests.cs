@@ -10,6 +10,11 @@ using Xunit;
 
 namespace Bookify.Core.Tests;
 
+/// <summary>
+/// Tests for BookGenerator helper methods.
+/// Note: The main GenerateAsync method behavior (resilient page rendering, early progress reporting)
+/// is tested through integration tests in Bookify.WebApi.Tests.
+/// </summary>
 public sealed class BookGeneratorTests
 {
     [Fact]
@@ -135,6 +140,37 @@ public sealed class BookGeneratorTests
             
             using var mergedDoc = PdfReader.Open(result, PdfDocumentOpenMode.ReadOnly);
             Assert.Equal(3, mergedDoc.PageCount);
+        }
+        finally
+        {
+            if (Directory.Exists(tempDir))
+            {
+                Directory.Delete(tempDir, true);
+            }
+        }
+    }
+
+    [Fact]
+    public void MergePartialPdfs_WithMissingFiles_SkipsMissingFiles()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+        Directory.CreateDirectory(tempDir);
+
+        try
+        {
+            var generator = CreateBookGenerator();
+
+            CreateTestPdfFile(Path.Combine(tempDir, "page_0000.pdf"));
+            CreateTestPdfFile(Path.Combine(tempDir, "page_0002.pdf"));
+
+            var jobId = Guid.NewGuid();
+            var result = generator.MergePartialPdfs(tempDir, "Test Book", jobId);
+
+            Assert.NotNull(result);
+            Assert.True(File.Exists(result));
+            
+            using var mergedDoc = PdfReader.Open(result, PdfDocumentOpenMode.ReadOnly);
+            Assert.Equal(2, mergedDoc.PageCount);
         }
         finally
         {

@@ -51,41 +51,62 @@ public sealed class BookGenerator
 
             var validatedUrl = await _urlValidator.ValidateAsync(url, cancellationToken);
 
-            var html = await FetchHtmlAsync(validatedUrl, cancellationToken);
+            progress?.Report(new BookJobStatus
+            {
+                JobId = jobId,
+                State = JobState.Running,
+                PagesTotal = 0,
+                PagesRendered = 0
+            });
+
+            var html = await FetchHtmlForTocAsync(validatedUrl, cancellationToken);
             var toc = await _tocExtractor.ExtractAsync(validatedUrl, html, cancellationToken);
 
+            IEnumerable<Uri> GetAllTocUrls(TocNode node)
+            {
+                yield return node.Url;
+                foreach (var child in node.Children)
+                {
+                    foreach (var childUrl in GetAllTocUrls(child))
+                    {
+                        yield return childUrl;
+                    }
+                }
+            }
+
+            var initialTocUrls = GetAllTocUrls(toc).ToList();
+            var initialPageCount = Math.Max(1, initialTocUrls.Count);
+
+            progress?.Report(new BookJobStatus
+            {
+                JobId = jobId,
+                State = JobState.Running,
+                PagesTotal = initialPageCount,
+                PagesRendered = 0
+            });
+
             var pages = await _linkDiscovery.DiscoverAsync(validatedUrl, cancellationToken);
-            
+
             string NormalizePageUrlForMerge(Uri uri)
             {
                 var builder = new UriBuilder(uri)
                 {
                     Query = string.Empty
                 };
-                
-                if (string.IsNullOrEmpty(builder.Fragment) || !builder.Fragment.StartsWith("#/", StringComparison.Ordinal))
+
+                // UriBuilder.Fragment does NOT contain '#'. For "#/route" URLs it will be "/route".
+                if (string.IsNullOrEmpty(builder.Fragment) || !builder.Fragment.StartsWith("/", StringComparison.Ordinal))
                 {
                     builder.Fragment = string.Empty;
                 }
-                
+
                 return builder.Uri.ToString().TrimEnd('/').ToLowerInvariant();
             }
-            
-            IEnumerable<Uri> GetAllTocUrls(TocNode node)
-            {
-                yield return node.Url;
-                foreach (var child in node.Children)
-                {
-                    foreach (var url in GetAllTocUrls(child))
-                    {
-                        yield return url;
-                    }
-                }
-            }
-            
-            var tocUrls = GetAllTocUrls(toc).ToList();
+
+            // Merge TOC urls into discovered pages (this is what fixes SPAs where crawler sees only bootstrap HTML)
+            var tocUrls = initialTocUrls;
             var discoveredUrlSet = new HashSet<string>(pages.Select(NormalizePageUrlForMerge));
-            
+
             foreach (var tocUrl in tocUrls)
             {
                 var normalized = NormalizePageUrlForMerge(tocUrl);
@@ -95,7 +116,7 @@ public sealed class BookGenerator
                     discoveredUrlSet.Add(normalized);
                 }
             }
-            
+
             if (pages.Count == 0)
             {
                 pages = new List<Uri> { validatedUrl };
@@ -114,8 +135,9 @@ public sealed class BookGenerator
 
             var pdfFiles = new ConcurrentDictionary<int, string>();
             var renderedCount = 0;
+            var failedPages = new ConcurrentBag<(int index, Uri url, string error)>();
 
-            await Parallel.ForEachAsync(orderedPages.Select((url, index) => (url, index)), new ParallelOptions
+            await Parallel.ForEachAsync(orderedPages.Select((pageUrl, index) => (pageUrl, index)), new ParallelOptions
             {
                 MaxDegreeOfParallelism = 2,
                 CancellationToken = cancellationToken
@@ -123,21 +145,55 @@ public sealed class BookGenerator
             {
                 var (pageUrl, index) = item;
                 var pdfPath = Path.Combine(tempDir, $"page_{index:D4}.pdf");
-                await _pdfRenderer.RenderPageAsync(pageUrl, pdfPath, ct);
-                pdfFiles[index] = pdfPath;
 
-                var current = Interlocked.Increment(ref renderedCount);
+                try
+                {
+                    await _pdfRenderer.RenderPageAsync(pageUrl, pdfPath, ct);
+                    
+                    if (File.Exists(pdfPath))
+                    {
+                        pdfFiles[index] = pdfPath;
+                        var current = Interlocked.Increment(ref renderedCount);
+                        progress?.Report(new BookJobStatus
+                        {
+                            JobId = jobId,
+                            State = JobState.Running,
+                            PagesTotal = totalPages,
+                            PagesRendered = current
+                        });
+                    }
+                    else
+                    {
+                        failedPages.Add((index, pageUrl, "PDF file was not created"));
+                    }
+                }
+                catch (Exception ex)
+                {
+                    failedPages.Add((index, pageUrl, ex.Message));
+                }
+            });
+
+            if (pdfFiles.Count == 0)
+            {
+                var errorDetails = failedPages.Any()
+                    ? $"All pages failed to render. Failed pages: {string.Join(", ", failedPages.Select(f => $"{f.url} ({f.error})"))}"
+                    : "No pages were successfully rendered";
+                
                 progress?.Report(new BookJobStatus
                 {
                     JobId = jobId,
-                    State = JobState.Running,
+                    State = JobState.Failed,
                     PagesTotal = totalPages,
-                    PagesRendered = current
+                    PagesRendered = 0,
+                    ErrorMessage = errorDetails
                 });
-            });
+                
+                throw new InvalidOperationException(errorDetails);
+            }
 
             var fileName = GenerateFileName(title, jobId);
             var finalPdfPath = Path.Combine(tempDir, fileName);
+
             var orderedPdfFiles = pdfFiles
                 .OrderBy(kvp => kvp.Key)
                 .Select(kvp => kvp.Value)
@@ -146,13 +202,18 @@ public sealed class BookGenerator
 
             _pdfMerger.MergeFiles(orderedPdfFiles, finalPdfPath);
 
+            var errorMessage = failedPages.Any()
+                ? $"Some pages failed to render ({failedPages.Count} of {totalPages}): {string.Join("; ", failedPages.OrderBy(f => f.index).Select(f => $"{f.url} - {f.error}"))}"
+                : null;
+
             progress?.Report(new BookJobStatus
             {
                 JobId = jobId,
                 State = JobState.Completed,
                 PagesTotal = totalPages,
-                PagesRendered = totalPages,
-                OutputFilePath = finalPdfPath
+                PagesRendered = pdfFiles.Count,
+                OutputFilePath = finalPdfPath,
+                ErrorMessage = errorMessage
             });
 
             return finalPdfPath;
@@ -200,8 +261,21 @@ public sealed class BookGenerator
         return finalPdfPath;
     }
 
-    private async Task<string> FetchHtmlAsync(Uri url, CancellationToken cancellationToken)
+    private async Task<string> FetchHtmlForTocAsync(Uri url, CancellationToken cancellationToken)
     {
+        try
+        {
+            var rendered = await _pdfRenderer.GetRenderedHtmlAsync(url, cancellationToken);
+            if (!string.IsNullOrWhiteSpace(rendered))
+            {
+                return rendered;
+            }
+        }
+        catch
+        {
+            // fallback below
+        }
+
         var request = new HttpRequestMessage(HttpMethod.Get, url);
         request.Headers.UserAgent.ParseAdd("Bookify/1.0");
 
@@ -223,12 +297,13 @@ public sealed class BookGenerator
             {
                 Query = string.Empty
             };
-            
-            if (string.IsNullOrEmpty(builder.Fragment) || !builder.Fragment.StartsWith("#/", StringComparison.Ordinal))
+
+            // UriBuilder.Fragment does NOT contain '#'. For "#/route" URLs it will be "/route".
+            if (string.IsNullOrEmpty(builder.Fragment) || !builder.Fragment.StartsWith("/", StringComparison.Ordinal))
             {
                 builder.Fragment = string.Empty;
             }
-            
+
             return builder.Uri.ToString().TrimEnd('/').ToLowerInvariant();
         }
 
@@ -256,6 +331,7 @@ public sealed class BookGenerator
         var remaining = pages
             .Where(p => !seen.Contains(NormalizePageUrlForOrdering(p)))
             .ToList();
+
         ordered.AddRange(remaining);
 
         return ordered;
@@ -287,4 +363,3 @@ public sealed class BookGenerator
         return $"{fileName}{jobId}.pdf";
     }
 }
-

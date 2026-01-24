@@ -2,6 +2,8 @@
 
 Bookify is a .NET 9 application that converts documentation websites into PDF books. It accepts a documentation website URL, validates it, crawls internal pages, interprets site navigation as chapters and subchapters, and renders all content into a single PDF book.
 
+## Still under development, it does not crawl the nested pages correctly when traversing the pages. ##
+
 ## Solution Structure
 
 The solution consists of six projects organized into application projects and test projects:
